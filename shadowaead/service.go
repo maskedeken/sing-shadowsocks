@@ -12,7 +12,6 @@ import (
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
-	"github.com/sagernet/sing/common/bufio/deadline"
 	E "github.com/sagernet/sing/common/exceptions"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
@@ -97,11 +96,11 @@ func (s *Service) newConnection(ctx context.Context, conn net.Conn, metadata M.M
 	metadata.Protocol = "shadowsocks"
 	metadata.Destination = destination
 
-	return s.handler.NewConnection(ctx, deadline.NewConn(&serverConn{
+	return s.handler.NewConnection(ctx, &serverConn{
 		Method: s.Method,
 		Conn:   conn,
 		reader: reader,
-	}), metadata)
+	}, metadata)
 }
 
 func (s *Service) NewError(ctx context.Context, err error) {
@@ -185,6 +184,10 @@ func (c *serverConn) WriteTo(w io.Writer) (n int64, err error) {
 	return c.reader.WriteTo(w)
 }
 
+func (c *serverConn) NeedAdditionalReadDeadline() bool {
+	return true
+}
+
 func (c *serverConn) Upstream() any {
 	return c.Conn
 }
@@ -193,7 +196,7 @@ func (c *serverConn) ReaderMTU() int {
 	return MaxPacketSize
 }
 
-func (c *serverConn) WriteIsThreadUnsafe() {
+func (c *Service) WriteIsThreadUnsafe() {
 }
 
 func (s *Service) NewPacket(ctx context.Context, conn N.PacketConn, buffer *buf.Buffer, metadata M.Metadata) error {
