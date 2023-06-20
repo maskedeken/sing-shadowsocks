@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sagernet/sing-shadowsocks"
+	shadowsocks "github.com/sagernet/sing-shadowsocks"
 	"github.com/sagernet/sing-shadowsocks/shadowaead"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
@@ -187,6 +187,8 @@ type Method struct {
 	udpBlockDecryptCipher cipher.Block
 	pskList               [][]byte
 	pskHash               []byte
+
+	reducedIVEntropy bool
 }
 
 func (m *Method) Name() string {
@@ -212,6 +214,10 @@ func (m *Method) DialEarlyConn(conn net.Conn, destination M.Socksaddr) net.Conn 
 
 func (m *Method) DialPacketConn(conn net.Conn) N.NetPacketConn {
 	return &clientPacketConn{m, conn, m.newUDPSession()}
+}
+
+func (m *Method) ReducedIVEntropy(b bool) {
+	m.reducedIVEntropy = b
 }
 
 type clientConn struct {
@@ -265,6 +271,9 @@ func (m *Method) writeExtendedIdentityHeaders(request *buf.Buffer, salt []byte) 
 func (c *clientConn) writeRequest(payload []byte) error {
 	salt := make([]byte, c.keySaltLength)
 	common.Must1(io.ReadFull(rand.Reader, salt))
+	if c.Method.reducedIVEntropy && len(salt) > 6 {
+		shadowsocks.RemapToPrintable(salt[:6])
+	}
 
 	key := SessionKey(c.pskList[len(c.pskList)-1], salt, c.keySaltLength)
 	writeCipher, err := c.constructor(common.Dup(key))

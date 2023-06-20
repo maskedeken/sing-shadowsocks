@@ -10,7 +10,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/sagernet/sing-shadowsocks"
+	shadowsocks "github.com/sagernet/sing-shadowsocks"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio/deadline"
@@ -39,6 +39,8 @@ type Method struct {
 	encryptConstructor func(key []byte, salt []byte) (cipher.Stream, error)
 	decryptConstructor func(key []byte, salt []byte) (cipher.Stream, error)
 	key                []byte
+
+	reducedIVEntropy bool
 }
 
 func New(method string, key []byte, password string) (shadowsocks.Method, error) {
@@ -159,6 +161,10 @@ func (m *Method) DialPacketConn(conn net.Conn) N.NetPacketConn {
 	return &clientPacketConn{m, conn}
 }
 
+func (m *Method) ReducedIVEntropy(b bool) {
+	m.reducedIVEntropy = b
+}
+
 type clientConn struct {
 	*Method
 	net.Conn
@@ -175,6 +181,9 @@ func (c *clientConn) writeRequest() error {
 
 	salt := buffer.Extend(c.saltLength)
 	common.Must1(io.ReadFull(rand.Reader, salt))
+	if c.Method.reducedIVEntropy && len(salt) > 6 {
+		shadowsocks.RemapToPrintable(salt[:6])
+	}
 
 	stream, err := c.encryptConstructor(c.key, salt)
 	if err != nil {

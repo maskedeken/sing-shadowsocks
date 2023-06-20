@@ -2,7 +2,10 @@ package shadowsocks
 
 import (
 	"crypto/md5"
+	"hash/crc32"
 	"net"
+
+	mRand "math/rand"
 
 	"github.com/sagernet/sing/common"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -22,6 +25,7 @@ type Method interface {
 	DialConn(conn net.Conn, destination M.Socksaddr) (net.Conn, error)
 	DialEarlyConn(conn net.Conn, destination M.Socksaddr) net.Conn
 	DialPacketConn(conn net.Conn) N.NetPacketConn
+	ReducedIVEntropy(bool)
 }
 
 type Service interface {
@@ -92,4 +96,12 @@ func Key(password []byte, keySize int) []byte {
 		h.Reset()
 	}
 	return b[:keySize]
+}
+
+func RemapToPrintable(input []byte) {
+	const charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\\\""
+	seed := mRand.New(mRand.NewSource(int64(crc32.ChecksumIEEE(input))))
+	for i := range input {
+		input[i] = charSet[seed.Intn(len(charSet))]
+	}
 }

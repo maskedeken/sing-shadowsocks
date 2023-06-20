@@ -46,6 +46,8 @@ func (m *NoneMethod) DialPacketConn(conn net.Conn) N.NetPacketConn {
 	return &nonePacketConn{conn}
 }
 
+func (m *NoneMethod) ReducedIVEntropy(bool) {}
+
 type noneConn struct {
 	net.Conn
 

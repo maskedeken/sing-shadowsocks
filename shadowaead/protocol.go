@@ -7,7 +7,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/sagernet/sing-shadowsocks"
+	shadowsocks "github.com/sagernet/sing-shadowsocks"
 	"github.com/sagernet/sing/common"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
@@ -83,6 +83,8 @@ type Method struct {
 	keySaltLength int
 	constructor   func(key []byte) (cipher.AEAD, error)
 	key           []byte
+
+	reducedIVEntropy bool
 }
 
 func (m *Method) Name() string {
@@ -110,6 +112,10 @@ func (m *Method) DialPacketConn(conn net.Conn) N.NetPacketConn {
 	return &clientPacketConn{m, conn}
 }
 
+func (m *Method) ReducedIVEntropy(b bool) {
+	m.reducedIVEntropy = b
+}
+
 type clientConn struct {
 	net.Conn
 	*Method
@@ -124,6 +130,9 @@ func (c *clientConn) writeRequest(payload []byte) error {
 	salt := common.Dup(_salt)
 	defer salt.Release()
 	salt.WriteRandom(c.keySaltLength)
+	if c.Method.reducedIVEntropy && salt.Len() > 6 {
+		shadowsocks.RemapToPrintable(salt.To(6))
+	}
 
 	_key := buf.StackNewSize(c.keySaltLength)
 	key := common.Dup(_key)
